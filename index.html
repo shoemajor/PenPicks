@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PenPicks">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>PenPicks</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080b10;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:calc(18px + env(safe-area-inset-top)) 16px calc(120px + env(safe-area-inset-bottom))}
+.top{display:flex;justify-content:space-between;align-items:center;margin:4px 0 20px}
+.logo{font-size:28px;font-weight:900;letter-spacing:-1px}
+.live{font-size:12px;padding:7px 10px;border:1px solid #29303d;border-radius:20px;color:#9da8ba}
+.hero{background:linear-gradient(145deg,#171d28,#10141c);border:1px solid #252d3a;border-radius:24px;padding:20px;margin-bottom:14px}
+.kicker{font-size:12px;color:#8e9aad;text-transform:uppercase;letter-spacing:1.2px}
+.play{font-size:27px;font-weight:900;margin:8px 0}
+.why{color:#b7c0cf;line-height:1.45}
+.row{display:flex;gap:10px;margin-top:16px}
+.pill{flex:1;background:#0b0f15;border:1px solid #29303d;border-radius:16px;padding:12px;min-width:0}
+.pill b{display:block;font-size:18px}.pill span{font-size:11px;color:#8792a4}
+h2{font-size:17px;margin:22px 2px 10px}
+.card{background:#10151e;border:1px solid #222a36;border-radius:18px;padding:15px;margin:10px 0}
+.cardtop{display:flex;justify-content:space-between;gap:10px}
+.name{font-weight:800}.tag{font-size:11px;background:#1d2633;border-radius:12px;padding:5px 8px;color:#b8c5d8;white-space:nowrap}
+.stat{font-size:13px;color:#9aa5b7;margin-top:7px;line-height:1.45}
+.buttons{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+button{border:0;border-radius:13px;padding:11px 13px;font-weight:800;background:#eef2f8;color:#0a0d12}
+.ghost{background:#1a202b;color:#d9e1ed}
+.good{color:#77e5a5}
+.voice{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(488px,calc(100% - 32px));background:#161d28;border:1px solid #2c3544;border-radius:20px;padding:12px;display:flex;gap:10px;align-items:center;box-shadow:0 12px 40px #0009}
+.mic{width:48px;height:48px;border-radius:50%;font-size:20px;flex:0 0 48px}.voice div{flex:1}.voice small{color:#8e99aa}.note{font-size:13px;margin-top:5px;color:#c9d1dd}
+.install{background:#0f1b17;border:1px solid #244a39;border-radius:18px;padding:14px;margin-bottom:14px;display:none}
+.install b{display:block;margin-bottom:4px}.install span{font-size:13px;color:#b6c8bd}
+@media(max-width:390px){.row{gap:7px}.pill{padding:10px}.play{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top"><div class="logo">PenPicks</div><div class="live">● PHONE APP DEMO</div></div>
+
+<div class="install" id="installTip">
+<b>Install PenPicks on iPhone</b>
+<span>Open this site in Safari → Share → Add to Home Screen.</span>
+</div>
+
+<div class="hero">
+<div class="kicker">Pattern Alert • Live Game</div>
+<div class="play">Recommended: LESS 32.5 PTS</div>
+<div class="why">Star scored 15 in Q1. Her live line jumped above her normal scoring pace. Your saved pattern says this is a spot you usually attack on the under.</div>
+<div class="row">
+<div class="pill"><b class="good">74%</b><span>Pattern confidence</span></div>
+<div class="pill"><b>8–2</b><span>Pattern record</span></div>
+<div class="pill"><b>Q2 8:41</b><span>Trigger time</span></div>
+</div>
+<div class="buttons"><button onclick="logPick('LESS 32.5 PTS')">Log this pick</button><button class="ghost" onclick="dismissAlert()">Dismiss</button></div>
+</div>
+
+<h2>What PenPicks is watching</h2>
+<div class="card"><div class="cardtop"><div class="name">Slow-start rebound</div><div class="tag">YOUR PATTERN</div></div><div class="stat">High-usage scorer starts cold → live full-game line drops → watch MORE if minutes, attempts and role remain normal.</div></div>
+<div class="card"><div class="cardtop"><div class="name">Hot Q1 regression</div><div class="tag">YOUR PATTERN</div></div><div class="stat">Player explodes early → live projection gets inflated → evaluate LESS against historical rest-of-game scoring.</div></div>
+<div class="card"><div class="cardtop"><div class="name">Bench minutes opportunity</div><div class="tag">YOUR PATTERN</div></div><div class="stat">Foul trouble, blowout risk or rotation change → bench player gets unexpected minutes → flag relevant props.</div></div>
+
+<h2>Tonight's learning log</h2>
+<div id="log"></div>
+</div>
+
+<div class="voice">
+<button class="mic" id="mic">🎙️</button>
+<div><b>Talk to PenPicks</b><small id="status"> Tap mic and say why you like a play.</small><div class="note" id="transcript"></div></div>
+</div>
+
+<script>
+const savedPicks = JSON.parse(localStorage.getItem('penpicks_picks') || '[]');
+function renderLog(){
+  const el=document.getElementById('log');
+  if(!savedPicks.length){
+    el.innerHTML='<div class="card"><div class="name">No picks logged yet</div><div class="stat">Tap “Log this pick” or use the mic. PenPicks saves your reasoning locally on this phone.</div></div>';
+    return;
+  }
+  el.innerHTML=savedPicks.slice().reverse().map(x=>`<div class="card"><div class="cardtop"><div class="name">${x.play}</div><div class="tag">${x.time}</div></div><div class="stat">${x.reason}</div></div>`).join('');
+}
+function logPick(play){
+  const now=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+  savedPicks.push({play,time:now,reason:'Hot first quarter inflated the live line. Waiting for final result to grade the pattern.'});
+  localStorage.setItem('penpicks_picks', JSON.stringify(savedPicks));
+  renderLog();
+}
+function dismissAlert(){document.querySelector('.hero').style.opacity=.4}
+renderLog();
+
+const mic=document.getElementById('mic'), status=document.getElementById('status'), transcript=document.getElementById('transcript');
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+  const r=new SR(); r.continuous=false; r.interimResults=false; r.lang='en-US';
+  mic.onclick=()=>{status.textContent=' Listening…'; transcript.textContent=''; r.start()};
+  r.onresult=e=>{
+    const t=e.results[0][0].transcript;
+    transcript.textContent='"'+t+'"';
+    status.textContent=' Voice note saved.';
+    localStorage.setItem('penpicks_note',t);
+  };
+  r.onerror=()=>status.textContent=' Voice input blocked. Check Safari microphone permissions.';
+}else{
+  mic.onclick=()=>status.textContent=' Voice transcription is not available in this browser.';
+}
+const old=localStorage.getItem('penpicks_note');
+if(old) transcript.textContent='Last note: "'+old+'"';
+
+const standalone=window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+if(!standalone) document.getElementById('installTip').style.display='block';
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+</script>
+</body></html>
