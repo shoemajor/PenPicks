@@ -307,15 +307,20 @@ function recordText(stats) {
 }
 
 async function loadPlayer() {
+   ...
+}
 
-  const player =
-    $('playerInput').value.trim();
+function parsePlayerSnippet(player, result) {
+   ...
+}
 
-  if (!player) {
-    $('status').textContent =
-      'Type a player name first.';
-    return;
-  }
+function detectSource(link = '') {
+   ...
+}
+
+function renderPlayerResult(result) {
+   ...
+}
 
   $('status').textContent =
     `Checking ${player}…`;
