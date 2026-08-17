@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b10"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="PenPicks">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><title>PenPicks</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080b10;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:calc(18px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))}
+.top,.tabs,.actions,.searchrow,.gamehead,.cardtop{display:flex;align-items:center}.top,.gamehead,.cardtop{justify-content:space-between}
+.logo{font-size:29px;font-weight:900}.badge{font-size:11px;padding:7px 10px;border:1px solid #29303d;border-radius:20px;color:#8ee3ab}
+.tabs,.actions{gap:8px}.tabs{margin:14px 0}.actions{margin-bottom:12px}
+button{border:0;border-radius:13px;padding:11px 14px;font-weight:850;background:#eef2f8;color:#0a0d12}.ghost,.tab{background:#171e29;color:#d9e1ed}.tab.on{background:#eef2f8;color:#0a0d12}
+.searchrow{gap:8px;margin-bottom:14px}.searchrow input{flex:1;min-width:0;background:#10151e;color:#fff;border:1px solid #29303d;border-radius:13px;padding:12px;font-size:14px}
+.status,.card,.game{background:#10151e;border:1px solid #222a36;border-radius:18px}.status{padding:12px 14px;color:#aab4c4;font-size:13px;line-height:1.4;margin-bottom:12px}.card,.game{padding:15px;margin:10px 0}
+.teams{font-size:18px;font-weight:850}.score{font-size:22px;font-weight:900;text-align:right}.clock{font-size:12px;color:#7ee4a7;margin-top:5px}.small,.stat{font-size:12px;color:#98a4b7;margin-top:7px;line-height:1.45}
+h2{font-size:17px;margin:24px 2px 10px}.name{font-weight:800}.tag{font-size:11px;background:#1d2633;border-radius:12px;padding:5px 8px;color:#b8c5d8}.empty{padding:28px 10px;text-align:center;color:#8f9aac}
+.debug{white-space:pre-wrap;word-break:break-word;font-size:11px;color:#8792a4;max-height:220px;overflow:auto}
+.playerStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.metric{background:#0b0f15;border:1px solid #27303d;border-radius:13px;padding:10px}.metric b{display:block;font-size:18px}.metric span{font-size:10px;color:#8792a4}
+.voice{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(488px,calc(100% - 32px));background:#161d28;border:1px solid #2c3544;border-radius:20px;padding:12px;display:flex;gap:10px;align-items:center;box-shadow:0 12px 40px #0009}.mic{width:48px;height:48px;border-radius:50%;font-size:20px;flex:0 0 48px}.voice div{flex:1}.voice small{color:#8e99aa}.note{font-size:12px;color:#c9d1dd;margin-top:4px}
+</style></head><body>
+<div class="app">
+<div class="top"><div class="logo">PenPicks</div><div class="badge">SERP FALLBACK</div></div>
+<div class="tabs"><button class="tab on" data-league="nba">NBA</button><button class="tab" data-league="wnba">WNBA</button></div>
+<div class="actions"><button id="refresh">Refresh games</button><button id="toggleRaw" class="ghost">Raw data</button></div>
+<div class="searchrow"><input id="playerInput" placeholder="Player lookup, e.g. Jackie Young"><button id="playerBtn" class="ghost">Check</button></div>
+<div id="status" class="status">Tap Refresh games. PenPicks now falls back to Google organic results when no sports card appears.</div>
+<div id="games"></div><div id="raw" class="card debug" hidden></div>
+<h2>What PenPicks is watching</h2>
+<div class="card"><div class="cardtop"><div class="name">Slow-start rebound</div><div class="tag">YOUR PATTERN</div></div><div class="stat">High-usage scorer starts cold → live line drops → watch MORE if minutes, attempts and role remain normal.</div></div>
+<div class="card"><div class="cardtop"><div class="name">Hot Q1 regression</div><div class="tag">YOUR PATTERN</div></div><div class="stat">Player explodes early → live projection gets inflated → evaluate LESS against historical rest-of-game scoring.</div></div>
+<div class="card"><div class="cardtop"><div class="name">Bench minutes opportunity</div><div class="tag">YOUR PATTERN</div></div><div class="stat">Foul trouble, blowout risk or rotation change → bench player gets unexpected minutes → flag relevant props.</div></div>
+<h2>Learning log</h2><div id="log"></div>
+</div>
+<div class="voice"><button class="mic" id="mic">🎙️</button><div><b>Talk to PenPicks</b><small id="voiceStatus"> Tap mic and log what you're seeing.</small><div class="note" id="transcript"></div></div></div>
+<script>
+const API='https://penpicksapi.ongosneakers.workers.dev/';let league='nba';
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));b.classList.add('on');league=b.dataset.league;$('status').textContent=`${league.toUpperCase()} selected. Tap Refresh games.`;$('games').innerHTML='';});
+$('refresh').onclick=()=>loadGames();$('playerBtn').onclick=()=>loadPlayer();$('toggleRaw').onclick=()=>{$('raw').hidden=!$('raw').hidden};
+async function call(params){const u=new URL(API);Object.entries(params).forEach(([k,v])=>v&&u.searchParams.set(k,v));const r=await fetch(u,{cache:'no-store'});const j=await r.json();$('raw').textContent=JSON.stringify(j,null,2);if(!r.ok||!j.ok)throw new Error(j.error||`HTTP ${r.status}`);return j;}
+async function loadGames(){ $('status').textContent=`Searching ${league.toUpperCase()} games…`;$('games').innerHTML='';try{const j=await call({league});$('status').textContent=`${league.toUpperCase()} • ${j.summary} • ${new Date(j.fetchedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`;$('games').innerHTML=j.games.length?j.games.map(g=>`<div class="game"><div class="gamehead"><div><div class="teams">${esc(g.away)} vs ${esc(g.home)}</div><div class="clock">${esc(g.status||'')}</div></div><div class="score">${g.awayScore??''}${g.awayScore!==null||g.homeScore!==null?'–':''}${g.homeScore??''}</div></div><div class="small">${esc(g.detail||'')}</div></div>`).join(''):'<div class="empty">No matchup parsed yet. Tap Raw data and send the first organic result.</div>';}catch(e){$('status').textContent='PenPicks error: '+e.message}}
+async function loadPlayer(){const player=$('playerInput').value.trim();if(!player){$('status').textContent='Type a player name first.';return}$('status').textContent=`Checking ${player}…`;$('games').innerHTML='';try{const j=await call({league,player});$('status').textContent=`${j.summary} for ${player}`;$('games').innerHTML=j.players.length?j.players.map(p=>renderPlayer(p)).join(''):'<div class="empty">No player stats recognized. Tap Raw data.</div>';}catch(e){$('status').textContent='Player lookup error: '+e.message}}
+function renderPlayer(p){const m=p.stats||{};const metrics=[['points','PTS'],['rebounds','REB'],['assists','AST'],['fga','FGA'],['minutes','MIN'],['fouls','PF']].filter(([k])=>m[k]!=null);return `<div class="game"><div class="teams">${esc(p.player)}</div>${metrics.length?`<div class="playerStats">${metrics.map(([k,l])=>`<div class="metric"><b>${esc(m[k])}</b><span>${l}</span></div>`).join('')}</div>`:''}<div class="small">${esc(p.detail||'')}</div></div>`}
+const saved=JSON.parse(localStorage.getItem('penpicks_picks')||'[]');function renderLog(){$('log').innerHTML=saved.length?saved.slice().reverse().map(x=>`<div class="card"><div class="cardtop"><div class="name">${esc(x.play)}</div><div class="tag">${esc(x.time)}</div></div><div class="stat">${esc(x.reason)}</div></div>`).join(''):'<div class="card"><div class="stat">No picks or voice notes logged yet.</div></div>'}renderLog();
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(SR){const r=new SR();r.lang='en-US';$('mic').onclick=()=>{$('voiceStatus').textContent=' Listening…';r.start()};r.onresult=e=>{const t=e.results[0][0].transcript;$('transcript').textContent='"'+t+'"';$('voiceStatus').textContent=' Saved.';saved.push({play:'VOICE NOTE',time:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),reason:t});localStorage.setItem('penpicks_picks',JSON.stringify(saved));renderLog()};r.onerror=()=>$('voiceStatus').textContent=' Voice permission blocked.'}else $('mic').onclick=()=>$('voiceStatus').textContent=' Voice transcription unavailable.';
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script></body></html>
