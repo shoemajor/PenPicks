@@ -34,15 +34,415 @@ h2{font-size:17px;margin:24px 2px 10px}.name{font-weight:800}.tag{font-size:11px
 </div>
 <div class="voice"><button class="mic" id="mic">🎙️</button><div><b>Talk to PenPicks</b><small id="voiceStatus"> Tap mic and log what you're seeing.</small><div class="note" id="transcript"></div></div></div>
 <script>
-const API='https://penpicksapi.ongosneakers.workers.dev/';let league='nba';
-const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));b.classList.add('on');league=b.dataset.league;$('status').textContent=`${league.toUpperCase()} selected. Tap Refresh games.`;$('games').innerHTML='';});
-$('refresh').onclick=()=>loadGames();$('playerBtn').onclick=()=>loadPlayer();$('toggleRaw').onclick=()=>{$('raw').hidden=!$('raw').hidden};
-async function call(params){const u=new URL(API);Object.entries(params).forEach(([k,v])=>v&&u.searchParams.set(k,v));const r=await fetch(u,{cache:'no-store'});const j=await r.json();$('raw').textContent=JSON.stringify(j,null,2);if(!r.ok||!j.ok)throw new Error(j.error||`HTTP ${r.status}`);return j;}
-async function loadGames(){ $('status').textContent=`Searching ${league.toUpperCase()} games…`;$('games').innerHTML='';try{const j=await call({league});$('status').textContent=`${league.toUpperCase()} • ${j.summary} • ${new Date(j.fetchedAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`;$('games').innerHTML=j.games.length?j.games.map(g=>`<div class="game"><div class="gamehead"><div><div class="teams">${esc(g.away)} vs ${esc(g.home)}</div><div class="clock">${esc(g.status||'')}</div></div><div class="score">${g.awayScore??''}${g.awayScore!==null||g.homeScore!==null?'–':''}${g.homeScore??''}</div></div><div class="small">${esc(g.detail||'')}</div></div>`).join(''):'<div class="empty">No matchup parsed yet. Tap Raw data and send the first organic result.</div>';}catch(e){$('status').textContent='PenPicks error: '+e.message}}
-async function loadPlayer(){const player=$('playerInput').value.trim();if(!player){$('status').textContent='Type a player name first.';return}$('status').textContent=`Checking ${player}…`;$('games').innerHTML='';try{const j=await call({league,player});$('status').textContent=`${j.summary} for ${player}`;$('games').innerHTML=j.players.length?j.players.map(p=>renderPlayer(p)).join(''):'<div class="empty">No player stats recognized. Tap Raw data.</div>';}catch(e){$('status').textContent='Player lookup error: '+e.message}}
-function renderPlayer(p){const m=p.stats||{};const metrics=[['points','PTS'],['rebounds','REB'],['assists','AST'],['fga','FGA'],['minutes','MIN'],['fouls','PF']].filter(([k])=>m[k]!=null);return `<div class="game"><div class="teams">${esc(p.player)}</div>${metrics.length?`<div class="playerStats">${metrics.map(([k,l])=>`<div class="metric"><b>${esc(m[k])}</b><span>${l}</span></div>`).join('')}</div>`:''}<div class="small">${esc(p.detail||'')}</div></div>`}
-const saved=JSON.parse(localStorage.getItem('penpicks_picks')||'[]');function renderLog(){$('log').innerHTML=saved.length?saved.slice().reverse().map(x=>`<div class="card"><div class="cardtop"><div class="name">${esc(x.play)}</div><div class="tag">${esc(x.time)}</div></div><div class="stat">${esc(x.reason)}</div></div>`).join(''):'<div class="card"><div class="stat">No picks or voice notes logged yet.</div></div>'}renderLog();
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(SR){const r=new SR();r.lang='en-US';$('mic').onclick=()=>{$('voiceStatus').textContent=' Listening…';r.start()};r.onresult=e=>{const t=e.results[0][0].transcript;$('transcript').textContent='"'+t+'"';$('voiceStatus').textContent=' Saved.';saved.push({play:'VOICE NOTE',time:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),reason:t});localStorage.setItem('penpicks_picks',JSON.stringify(saved));renderLog()};r.onerror=()=>$('voiceStatus').textContent=' Voice permission blocked.'}else $('mic').onclick=()=>$('voiceStatus').textContent=' Voice transcription unavailable.';
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
-</script></body></html>
+const API = 'https://penpicksapi.ongosneakers.workers.dev/';
+let league = 'nba';
+
+const $ = id => document.getElementById(id);
+
+const esc = s =>
+  String(s ?? '').replace(/[&<>"']/g, m => ({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  }[m]));
+
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    btn.classList.add('on');
+
+    league = btn.dataset.league;
+
+    $('status').textContent =
+      `${league.toUpperCase()} selected. Tap Refresh games.`;
+
+    $('games').innerHTML = '';
+  };
+});
+
+$('refresh').onclick = loadGames;
+
+$('playerBtn').onclick = loadPlayer;
+
+$('toggleRaw').onclick = () => {
+  $('raw').hidden = !$('raw').hidden;
+};
+
+async function callAPI(params) {
+  const url = new URL(API);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+
+  const response = await fetch(url.toString(), {
+    cache: 'no-store'
+  });
+
+  const data = await response.json();
+
+  $('raw').textContent =
+    JSON.stringify(data, null, 2);
+
+  if (!response.ok || !data.ok) {
+    throw new Error(
+      data.error || `HTTP ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+async function loadGames() {
+  $('status').textContent =
+    `Searching ${league.toUpperCase()} games…`;
+
+  $('games').innerHTML = '';
+
+  try {
+    const data = await callAPI({ league });
+
+    const sports = data.sports_results;
+
+    if (!sports) {
+      $('status').textContent =
+        'Google did not return a sports card.';
+
+      $('games').innerHTML =
+        '<div class="empty">No structured game data right now. Tap Raw data if you want to inspect the Google results.</div>';
+
+      return;
+    }
+
+    const games = [];
+
+    if (sports.game_spotlight) {
+      games.push(sports.game_spotlight);
+    }
+
+    if (Array.isArray(sports.games)) {
+      games.push(...sports.games);
+    }
+
+    if (!games.length) {
+      $('status').textContent =
+        'Sports card found, but no game objects were included.';
+
+      $('games').innerHTML =
+        '<div class="empty">Tap Raw data so we can inspect this response.</div>';
+
+      return;
+    }
+
+    $('status').textContent =
+      `${league.toUpperCase()} • ${games.length} game${games.length === 1 ? '' : 's'} found`;
+
+    $('games').innerHTML =
+      games.map(renderGame).join('');
+
+  } catch (error) {
+
+    $('status').textContent =
+      `PenPicks error: ${error.message}`;
+
+    $('games').innerHTML =
+      '<div class="empty">Could not load games.</div>';
+  }
+}
+
+function renderGame(game) {
+
+  const teams = game.teams || [];
+
+  const away = teams[0] || {};
+  const home = teams[1] || {};
+
+  const awayName =
+    away.name || 'Away';
+
+  const homeName =
+    home.name || 'Home';
+
+  const awayRecord =
+    recordText(away.team_stats);
+
+  const homeRecord =
+    recordText(home.team_stats);
+
+  const date =
+    game.date || '';
+
+  const venue =
+    game.venue ||
+    game.stadium ||
+    '';
+
+  const status =
+    game.status ||
+    date;
+
+  return `
+    <div class="game">
+
+      <div class="gamehead">
+
+        <div>
+          <div class="teams">
+            ${esc(awayName)}
+            vs
+            ${esc(homeName)}
+          </div>
+
+          <div class="clock">
+            ${esc(status)}
+          </div>
+        </div>
+
+      </div>
+
+      <div class="playerStats">
+
+        <div class="metric">
+          <b>${esc(awayRecord)}</b>
+          <span>${esc(awayName)}</span>
+        </div>
+
+        <div class="metric">
+          <b>${esc(homeRecord)}</b>
+          <span>${esc(homeName)}</span>
+        </div>
+
+        <div class="metric">
+          <b>${esc(venue || '—')}</b>
+          <span>Venue</span>
+        </div>
+
+      </div>
+
+      <div class="small">
+        ${esc(game.league || league.toUpperCase())}
+      </div>
+
+    </div>
+  `;
+}
+
+function recordText(stats) {
+  if (!stats) return '—';
+
+  const wins =
+    stats.wins ?? '';
+
+  const losses =
+    stats.losses ?? '';
+
+  if (wins === '' && losses === '') {
+    return '—';
+  }
+
+  return `${wins}-${losses}`;
+}
+
+async function loadPlayer() {
+
+  const player =
+    $('playerInput').value.trim();
+
+  if (!player) {
+    $('status').textContent =
+      'Type a player name first.';
+    return;
+  }
+
+  $('status').textContent =
+    `Checking ${player}…`;
+
+  $('games').innerHTML = '';
+
+  try {
+
+    const data =
+      await callAPI({
+        league,
+        player
+      });
+
+    const sports =
+      data.sports_results;
+
+    if (sports) {
+
+      $('games').innerHTML = `
+        <div class="game">
+
+          <div class="teams">
+            ${esc(player)}
+          </div>
+
+          <div class="small">
+            Google returned a structured sports result.
+          </div>
+
+          <div class="debug">
+            ${esc(
+              JSON.stringify(
+                sports,
+                null,
+                2
+              )
+            )}
+          </div>
+
+        </div>
+      `;
+
+      $('status').textContent =
+        `Structured result found for ${player}.`;
+
+      return;
+    }
+
+    $('status').textContent =
+      `No structured player card for ${player}.`;
+
+    $('games').innerHTML = `
+      <div class="empty">
+        Player search worked, but Google did not return structured live stats.
+        Tap Raw data to inspect the result.
+      </div>
+    `;
+
+  } catch (error) {
+
+    $('status').textContent =
+      `Player lookup error: ${error.message}`;
+  }
+}
+
+
+// Learning log
+
+const saved =
+  JSON.parse(
+    localStorage.getItem('penpicks_picks')
+    || '[]'
+  );
+
+function renderLog() {
+
+  $('log').innerHTML =
+    saved.length
+      ? saved
+          .slice()
+          .reverse()
+          .map(x => `
+            <div class="card">
+
+              <div class="cardtop">
+
+                <div class="name">
+                  ${esc(x.play)}
+                </div>
+
+                <div class="tag">
+                  ${esc(x.time)}
+                </div>
+
+              </div>
+
+              <div class="stat">
+                ${esc(x.reason)}
+              </div>
+
+            </div>
+          `)
+          .join('')
+      : `
+        <div class="card">
+          <div class="stat">
+            No picks or voice notes logged yet.
+          </div>
+        </div>
+      `;
+}
+
+renderLog();
+
+
+// Voice notes
+
+const SR =
+  window.SpeechRecognition ||
+  window.webkitSpeechRecognition;
+
+if (SR) {
+
+  const recognition =
+    new SR();
+
+  recognition.lang =
+    'en-US';
+
+  $('mic').onclick = () => {
+    $('voiceStatus').textContent =
+      ' Listening…';
+
+    recognition.start();
+  };
+
+  recognition.onresult = event => {
+
+    const text =
+      event.results[0][0].transcript;
+
+    $('transcript').textContent =
+      `"${text}"`;
+
+    $('voiceStatus').textContent =
+      ' Saved.';
+
+    saved.push({
+      play: 'VOICE NOTE',
+      time:
+        new Date().toLocaleTimeString(
+          [],
+          {
+            hour:'numeric',
+            minute:'2-digit'
+          }
+        ),
+      reason:text
+    });
+
+    localStorage.setItem(
+      'penpicks_picks',
+      JSON.stringify(saved)
+    );
+
+    renderLog();
+  };
+
+  recognition.onerror = () => {
+    $('voiceStatus').textContent =
+      ' Voice permission blocked.';
+  };
+
+} else {
+
+  $('mic').onclick = () => {
+    $('voiceStatus').textContent =
+      ' Voice transcription unavailable.';
+  };
+}
+
+
+// PWA
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker
+    .register('./sw.js')
+    .catch(() => {});
+}
+</script>
