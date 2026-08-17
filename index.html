@@ -130,8 +130,69 @@ async function loadGames() {
       $('status').textContent =
         'Sports card found, but no game objects were included.';
 
+async function loadGames() {
+  $('status').textContent =
+    `Searching ${league.toUpperCase()} games…`;
+
+  $('games').innerHTML = '';
+
+  try {
+    const data = await callAPI({ league });
+
+    const sports = data?.sports_results || null;
+
+    if (!sports) {
+      $('status').textContent =
+        'Google did not return a sports card.';
+
+      $('games').innerHTML =
+        '<div class="empty">No structured game data right now. Tap Raw data if you want to inspect the Google results.</div>';
+
+      return;
+    }
+
+    const games = [];
+
+    if (sports.game_spotlight) {
+      games.push(sports.game_spotlight);
+    }
+
+    if (Array.isArray(sports.games)) {
+      games.push(...sports.games);
+    }
+
+    if (Array.isArray(sports.tables)) {
+      for (const table of sports.tables) {
+        if (Array.isArray(table?.games)) {
+          games.push(...table.games);
+        }
+      }
+    }
+
+    if (!games.length) {
+      $('status').textContent =
+        'Sports card found, but no game objects were included.';
+
       $('games').innerHTML =
         '<div class="empty">Tap Raw data so we can inspect this response.</div>';
+
+      return;
+    }
+
+    $('status').textContent =
+      `${league.toUpperCase()} • ${games.length} game${games.length === 1 ? '' : 's'} found`;
+
+    $('games').innerHTML =
+      games.map(renderGame).join('');
+
+  } catch (error) {
+    $('status').textContent =
+      `PenPicks error: ${error.message}`;
+
+    $('games').innerHTML =
+      '<div class="empty">Could not load games.</div>';
+  }
+}
 
       return;
     }
