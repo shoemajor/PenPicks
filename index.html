@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PenPicks">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>PenPicks</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080b10;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:calc(14px + env(safe-area-inset-top)) 12px calc(92px + env(safe-area-inset-bottom))}
+.top,.tabs,.actions,.gamehead,.cardtop,.compactMarkets,.compactMarket,.histrow,.bookrow{display:flex;align-items:center}
+.top,.gamehead,.cardtop,.compactMarket,.histrow,.bookrow{justify-content:space-between}
+.logo{font-size:27px;font-weight:900}.badge{font-size:10px;padding:6px 9px;border:1px solid #29303d;border-radius:18px;color:#8ee3ab}
+.tabs,.actions{display:flex;gap:7px}.tabs{margin:11px 0}.actions{margin-bottom:9px}
+button{border:0;border-radius:11px;padding:9px 12px;font-weight:850;background:#eef2f8;color:#0a0d12;font-size:13px}
+.ghost,.tab{background:#171e29;color:#d9e1ed}.tab.on{background:#eef2f8;color:#0a0d12}
+.status,.card,.game{background:#10151e;border:1px solid #29303d;border-radius:15px}
+.status{padding:9px 11px;color:#aab4c4;font-size:11px;line-height:1.35;margin-bottom:9px}
+.card,.game{padding:11px;margin:8px 0}.game{cursor:pointer}
+.teams{font-size:16px;font-weight:850}.clock{font-size:11px;color:#7ee4a7;margin-top:4px}
+.small,.stat{font-size:10px;color:#98a4b7;margin-top:5px;line-height:1.35}
+.tag{font-size:9px;background:#1d2633;border-radius:10px;padding:4px 7px;color:#b8c5d8}
+.history{display:flex;justify-content:space-between;font-size:9px;color:#98a4b7;margin-top:6px;gap:6px}
+.back{margin-bottom:8px}.empty{text-align:center;color:#8f9aac;padding:18px}
+.debug{white-space:pre-wrap;word-break:break-word;font-size:9px;max-height:220px;overflow:auto}
+
+.player{padding:10px 0;border-bottom:1px solid #27303d}.player:last-child{border:0}.pname{font-weight:900;font-size:15px}
+.compactMarkets{gap:5px;margin-top:8px;flex-wrap:nowrap}
+.compactMarket{flex:1;min-width:0;background:#0b0f15;border:1px solid #27303d;border-radius:10px;padding:7px 6px;display:block;text-align:center}
+.compactMarket .label{font-size:8px;color:#8792a4;letter-spacing:.03em}
+.compactMarket .value{font-size:17px;font-weight:900;line-height:1.1;margin-top:2px}
+.histrow{gap:6px;margin-top:7px;padding:6px 8px;background:#121925;border:1px solid #2a3443;border-radius:10px;font-size:9px;color:#aab4c4;flex-wrap:wrap}
+.signal{margin-top:7px;border-radius:10px;padding:7px 8px;font-weight:850;font-size:10px;background:#171e29}
+.signal.more{color:#8ee3ab}.signal.less{color:#ffb27a}.signal.neutral{color:#b8c5d8}
+.booksToggle{margin-top:7px;width:100%;background:#151c27;color:#cbd5e1;padding:7px 9px;font-size:10px}
+.booksPanel{display:none;margin-top:6px;background:#0b0f15;border:1px solid #27303d;border-radius:10px;padding:6px 8px}
+.booksPanel.open{display:block}
+.bookgroup{padding:5px 0;border-top:1px solid #202938}.bookgroup:first-child{border-top:0}
+.booktitle{font-size:9px;color:#8f9aac;font-weight:800;margin-bottom:3px}
+.bookrow{font-size:9px;padding:2px 0;gap:6px}.bookname{font-weight:700}.odds{color:#b9c4d6;text-align:right}
+
+.voice{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(488px,calc(100% - 24px));background:#161d28;border:1px solid #2c3544;border-radius:16px;padding:8px 10px;display:flex;gap:8px;align-items:center;box-shadow:0 10px 30px #0009}
+.mic{width:38px;height:38px;border-radius:50%;font-size:16px;padding:0}.voice b{font-size:13px}.voice small{color:#8e99aa;font-size:10px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top"><div class="logo">PenPicks</div><div class="badge">PROP BOARD</div></div>
+
+  <div class="tabs">
+    <button class="tab on" data-league="nba">NBA</button>
+    <button class="tab" data-league="wnba">WNBA</button>
+  </div>
+
+  <div class="actions">
+    <button id="refresh">Refresh games</button>
+    <button id="rawBtn" class="ghost">Raw data</button>
+  </div>
+
+  <div id="status" class="status">Tap Refresh games, then tap a matchup. Only players with active sportsbook props will be shown.</div>
+  <div id="main"></div>
+  <div id="raw" class="card debug" hidden></div>
+
+  <div id="patterns">
+    <div class="card"><div class="cardtop"><b>Slow-start rebound</b><span class="tag">WATCH MORE</span></div><div class="stat">If a strong historical scorer starts cold while minutes and shot volume stay normal, flag the live line.</div></div>
+    <div class="card"><div class="cardtop"><b>Hot-start regression</b><span class="tag">WATCH LESS</span></div><div class="stat">If early scoring is far above historical expectation, flag inflated live lines.</div></div>
+  </div>
+</div>
+
+<div class="voice">
+  <button class="mic" id="mic">🎙️</button>
+  <div><b>Talk to PenPicks</b><small id="voiceStatus"> Tap mic and log what you're seeing.</small></div>
+</div>
+
+<script>
+const API='https://penpicksapi.ongosneakers.workers.dev/';
+let league='nba';
+let currentGames=[];
+let historyCache={};
+
+const $=x=>document.getElementById(x);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  league=b.dataset.league;
+  $('patterns').hidden=false;
+  $('status').textContent=league.toUpperCase()+' selected. Tap Refresh games.';
+  $('main').innerHTML='';
+});
+
+$('refresh').onclick=loadGames;
+$('rawBtn').onclick=()=>$('raw').hidden=!$('raw').hidden;
+
+async function api(params){
+  const u=new URL(API);
+  Object.entries(params).forEach(([k,v])=>v!==undefined&&v!==null&&v!==''&&u.searchParams.set(k,v));
+  u.searchParams.set('cb',Date.now());
+  const r=await fetch(u,{cache:'no-store'});
+  const d=await r.json();
+  $('raw').textContent=JSON.stringify(d,null,2);
+  if(!r.ok||!d.ok)throw Error(d.error||r.status);
+  return d;
+}
+
+async function loadGames(){
+  $('patterns').hidden=false;
+  $('status').textContent='Searching '+league.toUpperCase()+' games…';
+  $('main').innerHTML='';
+  try{
+    const d=await api({league});
+    const s=d?.sports_results||null;
+    const g=[];
+    if(s?.game_spotlight)g.push(s.game_spotlight);
+    if(Array.isArray(s?.games))g.push(...s.games);
+    if(Array.isArray(s?.tables))s.tables.forEach(t=>Array.isArray(t?.games)&&g.push(...t.games));
+    currentGames=g;
+
+    if(!g.length){
+      $('status').textContent='No structured games returned right now.';
+      $('main').innerHTML='<div class="empty">Tap Raw data to inspect the response.</div>';
+      return;
+    }
+
+    $('status').textContent=g.length+' game'+(g.length===1?'':'s')+' found • tap a matchup';
+    $('main').innerHTML=g.map((x,i)=>gameCard(x,i)).join('');
+    document.querySelectorAll('[data-game]').forEach(el=>el.onclick=()=>openProps(+el.dataset.game));
+  }catch(e){
+    $('status').textContent='PenPicks error: '+e.message;
+  }
+}
+
+function gameCard(g,i){
+  const t=g.teams||[],away=t[0]||{},home=t[1]||{};
+  return `<div class="game" data-game="${i}">
+    <div class="gamehead">
+      <div>
+        <div class="teams">${esc(away.name||'Away')} vs ${esc(home.name||'Home')}</div>
+        <div class="clock">${esc(g.status||g.date||'')}</div>
+      </div>
+      <span class="tag">VIEW PROPS ›</span>
+    </div>
+    <div class="history">
+      <span>${esc(record(away.team_stats))}</span>
+      <span>${esc(g.venue||g.stadium||'')}</span>
+      <span>${esc(record(home.team_stats))}</span>
+    </div>
+  </div>`;
+}
+
+function record(s){return s&&s.wins!=null?`${s.wins}-${s.losses}`:'—'}
+
+async function openProps(i){
+  const g=currentGames[i];
+  const t=g.teams||[],away=t[0]||{},home=t[1]||{};
+  $('patterns').hidden=true;
+  $('status').textContent='Loading active sportsbook props…';
+  $('main').innerHTML='<button class="ghost back" id="back">‹ Back to games</button><div class="empty">Loading prop board…</div>';
+  $('back').onclick=loadGames;
+
+  try{
+    const d=await api({league,props:1,home:home.name||'',away:away.name||''});
+
+    if(!d.eventFound){
+      $('status').textContent='No matching sportsbook event found yet.';
+      $('main').innerHTML='<button class="ghost back" id="back2">‹ Back to games</button><div class="empty">No active sportsbook event yet.</div>';
+      $('back2').onclick=loadGames;
+      return;
+    }
+
+    const players=Array.isArray(d.players)?d.players:[];
+    $('status').textContent=`${players.length} players with active props • API credits remaining: ${d.quota?.remaining??'—'}`;
+
+    $('main').innerHTML=`
+      <button class="ghost back" id="back3">‹ Back to games</button>
+      <div class="game">
+        <div class="teams">${esc(d.event?.away||away.name)} vs ${esc(d.event?.home||home.name)}</div>
+        <div class="clock">${formatTime(d.event?.commenceTime)}</div>
+      </div>
+      <div class="card" id="propPlayers">
+        ${players.map((p,i)=>propPlaceholder(p,i)).join('')}
+      </div>`;
+    $('back3').onclick=loadGames;
+
+    document.querySelectorAll('.booksToggle').forEach(btn=>btn.onclick=()=>{
+      const panel=$(btn.dataset.target);
+      panel.classList.toggle('open');
+      btn.textContent=panel.classList.contains('open')?'Hide books':'Books';
+    });
+
+    for(let i=0;i<players.length;i++) await fillHistory(players[i],i);
+  }catch(e){
+    $('status').textContent='Prop board error: '+e.message;
+  }
+}
+
+function propPlaceholder(p,i){
+  return `<div class="player" id="prop-player-${i}">
+    <div class="cardtop">
+      <div class="pname">${esc(p.name)}</div>
+      <span class="tag">${Object.keys(p.markets||{}).length} MARKETS</span>
+    </div>
+    ${renderCompactMarkets(p.markets||{})}
+    <div class="histbox"><div class="histrow"><span>Loading historical expectation…</span></div></div>
+    ${renderBooksPanel(p.markets||{},i)}
+  </div>`;
+}
+
+function renderCompactMarkets(markets){
+  const order=[['points','PTS'],['rebounds','REB'],['assists','AST'],['pra','PRA']];
+  return `<div class="compactMarkets">${
+    order.map(([k,label])=>{
+      const m=markets[k];
+      return `<div class="compactMarket"><div class="label">${label} LINE</div><div class="value">${m?.consensusLine??'—'}</div></div>`;
+    }).join('')
+  }</div>`;
+}
+
+function renderBooksPanel(markets,i){
+  const order=[['points','PTS'],['rebounds','REB'],['assists','AST'],['pra','PRA']];
+  const groups=order.filter(([k])=>markets[k]).map(([k,label])=>{
+    const m=markets[k];
+    return `<div class="bookgroup">
+      <div class="booktitle">${label}</div>
+      ${(m.books||[]).slice(0,4).map(b=>`<div class="bookrow">
+        <span class="bookname">${esc(b.name)}</span>
+        <span class="odds">${b.line??'—'} • O ${formatOdds(b.over)} • U ${formatOdds(b.under)}</span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+  return `<button class="booksToggle" data-target="books-${i}">Books</button><div class="booksPanel" id="books-${i}">${groups}</div>`;
+}
+
+async function fillHistory(player,i){
+  const el=$(`prop-player-${i}`);
+  if(!el)return;
+
+  let history=historyCache[player.name];
+  if(!history){
+    try{
+      const d=await api({league,player:player.name});
+      history=parseHistory(player.name,Array.isArray(d.organic_results)?d.organic_results:[]);
+      historyCache[player.name]=history;
+    }catch{
+      history=null;
+    }
+  }
+
+  const box=el.querySelector('.histbox');
+  if(!box)return;
+
+  if(!history){
+    box.innerHTML='<div class="histrow"><span>Historical stats unavailable</span></div>';
+    return;
+  }
+
+  const pLine=player.markets?.points?.consensusLine;
+  const signal=makeSignal(history.pts,pLine);
+
+  box.innerHTML=`
+    <div class="histrow">
+      <span>${esc(history.span)}</span>
+      <span>HIST PTS ${history.pts??'—'}</span>
+      <span>HIST REB ${history.reb??'—'}</span>
+      <span>HIST AST ${history.ast??'—'}</span>
+    </div>
+    ${signal.html}`;
+}
+
+function parseHistory(name,results){
+  const candidates=[];
+  for(const r of results){
+    const text=`${r.title||''} ${r.snippet||''}`;
+    const stats={};
+    for(const [k,re] of Object.entries({
+      pts:/(\d+(?:\.\d+)?)\s+points?/i,
+      reb:/(\d+(?:\.\d+)?)\s+rebounds?/i,
+      ast:/(\d+(?:\.\d+)?)\s+assists?/i
+    })){
+      const m=text.match(re);
+      if(m)stats[k]=Number(m[1]);
+    }
+    if(!(stats.pts!=null||stats.reb!=null||stats.ast!=null))continue;
+    const last=text.match(/last\s+(\d+)\s+games?/i);
+    candidates.push({
+      ...stats,
+      span:last?`L${last[1]}`:(/season/i.test(text)?'Season':'Recent'),
+      source:source(r.link),
+      snippet:r.snippet||''
+    });
+  }
+  if(!candidates.length)return null;
+  candidates.sort((a,b)=>{
+    const ac=['pts','reb','ast'].filter(k=>a[k]!=null).length;
+    const bc=['pts','reb','ast'].filter(k=>b[k]!=null).length;
+    const ap=a.source==='StatMuse'?2:a.source==='ESPN'?1:0;
+    const bp=b.source==='StatMuse'?2:b.source==='ESPN'?1:0;
+    return (bc+bp)-(ac+ap);
+  });
+  return candidates[0];
+}
+
+function makeSignal(hist,line){
+  if(typeof hist!=='number'||typeof line!=='number')return {html:'<div class="signal neutral">No points edge yet</div>'};
+  const diff=hist-line;
+  if(diff>=2)return {html:`<div class="signal more">MORE WATCH • history +${diff.toFixed(1)} vs sportsbook line</div>`};
+  if(diff<=-2)return {html:`<div class="signal less">LESS WATCH • history ${diff.toFixed(1)} vs sportsbook line</div>`};
+  return {html:`<div class="signal neutral">NEAR LINE • ${diff.toFixed(1)} vs sportsbook line</div>`};
+}
+
+function source(l=''){
+  if(l.includes('statmuse'))return'StatMuse';
+  if(l.includes('espn'))return'ESPN';
+  if(l.includes('basketball-reference'))return'Basketball Ref';
+  if(l.includes('wnba.com'))return'WNBA';
+  if(l.includes('nba.com'))return'NBA';
+  return'Google';
+}
+
+function formatOdds(v){if(v==null)return'—';return Number(v)>0?`+${v}`:`${v}`}
+function formatTime(v){
+  if(!v)return'';
+  try{return new Date(v).toLocaleString([],{weekday:'short',hour:'numeric',minute:'2-digit'});}catch{return v}
+}
+
+const saved=JSON.parse(localStorage.getItem('penpicks_picks')||'[]');
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+  const r=new SR();r.lang='en-US';
+  $('mic').onclick=()=>{$('voiceStatus').textContent=' Listening…';r.start()};
+  r.onresult=e=>{
+    const text=e.results[0][0].transcript;
+    saved.push({play:'VOICE NOTE',reason:text,time:new Date().toLocaleTimeString()});
+    localStorage.setItem('penpicks_picks',JSON.stringify(saved));
+    $('voiceStatus').textContent=' Saved.';
+  };
+  r.onerror=()=>$('voiceStatus').textContent=' Voice permission blocked.';
+}else{
+  $('mic').onclick=()=>$('voiceStatus').textContent=' Voice transcription unavailable.';
+}
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body>
+</html>
