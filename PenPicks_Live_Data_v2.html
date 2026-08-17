@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b10"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="PenPicks">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><title>PenPicks</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080b10;color:#f5f7fb;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:calc(18px + env(safe-area-inset-top)) 16px calc(105px + env(safe-area-inset-bottom))}
+.top,.tabs,.gamehead,.player,.cardtop{display:flex;align-items:center}.top,.gamehead,.cardtop{justify-content:space-between}.logo{font-size:28px;font-weight:900}.badge{font-size:11px;padding:7px 10px;border:1px solid #29303d;border-radius:20px;color:#9da8ba}
+.tabs{gap:8px;margin:12px 0 16px}.tab{background:#141a24;color:#9ca8ba;padding:10px 16px}.tab.on{background:#f3f6fb;color:#0a0d12}
+.status{padding:12px 14px;border-radius:16px;background:#10151e;border:1px solid #222a36;color:#aab4c4;font-size:13px;margin-bottom:12px}
+.game{background:#111720;border:1px solid #252e3b;border-radius:20px;padding:15px;margin:10px 0}.teams{font-size:18px;font-weight:850}.score{font-size:22px;font-weight:900}.clock{font-size:12px;color:#7ee4a7;margin-top:4px}.game button{width:100%;margin-top:12px}
+button{border:0;border-radius:13px;padding:11px 13px;font-weight:800;background:#eef2f8;color:#0a0d12}.ghost{background:#1a202b;color:#d9e1ed}
+.players{margin-top:12px;border-top:1px solid #252e3b;padding-top:8px}.player{justify-content:space-between;padding:10px 2px;border-bottom:1px solid #1c2430;gap:8px}.pname{font-weight:750}.pstats{font-size:11px;color:#a6b1c2;text-align:right}
+h2{font-size:17px;margin:22px 2px 10px}.card{background:#10151e;border:1px solid #222a36;border-radius:18px;padding:15px;margin:10px 0}.name{font-weight:800}.tag{font-size:11px;background:#1d2633;border-radius:12px;padding:5px 8px;color:#b8c5d8}.stat{font-size:13px;color:#9aa5b7;margin-top:7px;line-height:1.45}
+.voice{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(488px,calc(100% - 32px));background:#161d28;border:1px solid #2c3544;border-radius:20px;padding:12px;display:flex;gap:10px;align-items:center;box-shadow:0 12px 40px #0009}.mic{width:48px;height:48px;border-radius:50%;font-size:20px;flex:0 0 48px}.voice div{flex:1}.voice small{color:#8e99aa}.note{font-size:12px;color:#c9d1dd;margin-top:4px}
+.empty{padding:28px 12px;text-align:center;color:#8f9aac}
+</style></head><body><div class="app">
+<div class="top"><div class="logo">PenPicks</div><div class="badge" id="liveBadge">LIVE DATA</div></div>
+<div class="tabs"><button class="tab on" data-league="00">NBA</button><button class="tab" data-league="10">WNBA</button></div>
+<div class="status" id="status">Loading today's games…</div><div id="games"></div>
+
+<h2>What PenPicks is watching</h2>
+<div class="card"><div class="cardtop"><div class="name">Slow-start rebound</div><div class="tag">YOUR PATTERN</div></div><div class="stat">High-usage scorer starts cold → live full-game line drops → watch MORE if minutes, attempts and role remain normal.</div></div>
+<div class="card"><div class="cardtop"><div class="name">Hot Q1 regression</div><div class="tag">YOUR PATTERN</div></div><div class="stat">Player explodes early → live projection gets inflated → evaluate LESS against historical rest-of-game scoring.</div></div>
+<div class="card"><div class="cardtop"><div class="name">Bench minutes opportunity</div><div class="tag">YOUR PATTERN</div></div><div class="stat">Foul trouble, blowout risk or rotation change → bench player gets unexpected minutes → flag relevant props.</div></div>
+<h2>Learning log</h2><div id="log"></div>
+</div>
+<div class="voice"><button class="mic" id="mic">🎙️</button><div><b>Talk to PenPicks</b><small id="voiceStatus"> Tap mic and log what you're seeing.</small><div class="note" id="transcript"></div></div></div>
+<script>
+let league='00'; const gamesEl=document.getElementById('games'), statusEl=document.getElementById('status');
+const saved=JSON.parse(localStorage.getItem('penpicks_picks')||'[]');
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function renderLog(){let el=document.getElementById('log');el.innerHTML=saved.length?saved.slice().reverse().map(x=>`<div class="card"><div class="cardtop"><div class="name">${esc(x.play)}</div><div class="tag">${esc(x.time)}</div></div><div class="stat">${esc(x.reason)}</div></div>`).join(''):'<div class="card"><div class="stat">No picks logged yet.</div></div>'}renderLog();
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));b.classList.add('on');league=b.dataset.league;loadGames()});
+function scoreboardURL(){return `https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_${league}.json`}
+async function loadGames(){
+ statusEl.textContent=`Loading ${league==='00'?'NBA':'WNBA'} games…`;
+ try{
+  let r=await fetch(scoreboardURL(),{cache:'no-store'}); if(!r.ok) throw Error(r.status);
+  let j=await r.json(), games=j.scoreboard?.games||[];
+  statusEl.textContent=`${league==='00'?'NBA':'WNBA'} • ${games.length} game${games.length===1?'':'s'} today • refreshes every 30 sec`;
+  if(!games.length){gamesEl.innerHTML='<div class="empty">No games on today’s scoreboard.</div>';return}
+  gamesEl.innerHTML=games.map(g=>{
+   let a=g.awayTeam||{},h=g.homeTeam||{}, live=g.gameStatus===2;
+   return `<div class="game" id="g${g.gameId}"><div class="gamehead"><div><div class="teams">${esc(a.teamTricode)} @ ${esc(h.teamTricode)}</div><div class="clock">${esc(g.gameStatusText||'Scheduled')}${live?` • Q${g.period||''} ${esc(g.gameClock||'')}`:''}</div></div><div class="score">${a.score??0}–${h.score??0}</div></div><button onclick="loadBox('${g.gameId}')">Player stats</button><div class="players" id="p${g.gameId}" hidden></div></div>`
+  }).join('');
+ }catch(e){statusEl.textContent='Live feed could not load in this browser. Tap refresh or try again shortly.';gamesEl.innerHTML='<div class="empty">PenPicks could not reach the basketball feed.</div>'}
+}
+async function loadBox(id){
+ let el=document.getElementById('p'+id); if(!el.hidden){el.hidden=true;return} el.hidden=false;el.innerHTML='<div class="empty">Loading player stats…</div>';
+ try{
+  let r=await fetch(`https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${id}.json`,{cache:'no-store'});let j=await r.json(),g=j.game;
+  let players=[...(g.awayTeam?.players||[]),...(g.homeTeam?.players||[])].filter(p=>p.played!=='0' || p.statistics?.minutes);
+  players.sort((a,b)=>(b.statistics?.points||0)-(a.statistics?.points||0));
+  el.innerHTML=players.map(p=>{let s=p.statistics||{};return `<div class="player"><div class="pname">${esc(p.name||p.nameI)}</div><div class="pstats">${s.points||0} PTS · ${s.fieldGoalsAttempted||0} FGA<br>${s.assists||0} AST · ${s.reboundsTotal||0} REB · ${s.foulsPersonal||0} PF · ${esc(s.minutes||'')}</div></div>`}).join('')||'<div class="empty">No player stats yet.</div>';
+ }catch(e){el.innerHTML='<div class="empty">Player stats unavailable right now.</div>'}
+}
+loadGames();setInterval(loadGames,30000);
+const mic=document.getElementById('mic'),vs=document.getElementById('voiceStatus'),tr=document.getElementById('transcript'),SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){let r=new SR();r.lang='en-US';mic.onclick=()=>{vs.textContent=' Listening…';r.start()};r.onresult=e=>{let t=e.results[0][0].transcript;tr.textContent='"'+t+'"';vs.textContent=' Saved.';localStorage.setItem('penpicks_note',t);saved.push({play:'VOICE NOTE',time:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),reason:t});localStorage.setItem('penpicks_picks',JSON.stringify(saved));renderLog()};r.onerror=()=>vs.textContent=' Voice permission blocked.'}else mic.onclick=()=>vs.textContent=' Voice transcription unavailable here.';
+</script></body></html>
